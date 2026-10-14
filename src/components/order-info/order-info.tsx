@@ -1,44 +1,57 @@
+import { useEffect, useMemo } from 'react';
+import { useParams } from 'react-router-dom';
+
 import { Preloader, OrderInfoUI } from '@ui';
-import { useMemo } from 'react';
+import { useDispatch, useSelector } from '@services/store';
+import { getOrderByNumber } from '@slices/orderSlice';
 
 import type { TIngredient } from '@utils-types';
 
 export const OrderInfo = (): React.JSX.Element => {
-  /** TODO: взять переменные orderData и ingredients из стора */
-  const orderData = {
-    createdAt: '',
-    ingredients: [],
-    _id: '',
-    status: '',
-    name: '',
-    updatedAt: 'string',
-    number: 0,
-  };
+  const { number } = useParams<{ number: string }>();
+  const orderNumber = Number(number);
+  const dispatch = useDispatch();
 
-  const ingredients: TIngredient[] = [];
+  // Ищем заказ в трёх местах по приоритету
+  const orderData = useSelector((state) => {
+    if (state.order.currentOrder?.number === orderNumber) {
+      return state.order.currentOrder;
+    }
+    const fromFeed = state.feed.orders.find((o) => o.number === orderNumber);
+    if (fromFeed) return fromFeed;
+    const fromOrders = state.orders.orders.find((o) => o.number === orderNumber);
+    return fromOrders;
+  });
 
-  /* Готовим данные для отображения */
+  const ingredients = useSelector((state) => state.ingredients.ingredients);
+
+  // Если заказа нет нигде — дозапрашиваем
+  useEffect(() => {
+    if (!orderData && orderNumber) {
+      dispatch(getOrderByNumber(orderNumber));
+    }
+  }, [dispatch, orderData, orderNumber]);
+
   const orderInfo = useMemo(() => {
     if (!orderData || !ingredients.length) return null;
 
     const date = new Date(orderData.createdAt);
 
-    type TIngredientsWithCount = Record<string, TIngredient & { count: number }>;
+    type TIngredientsWithCount = Record<
+      string,
+      TIngredient & { count: number }
+    >;
 
     const ingredientsInfo = orderData.ingredients.reduce(
       (acc: TIngredientsWithCount, item) => {
         if (!acc[item]) {
           const ingredient = ingredients.find((ing) => ing._id === item);
           if (ingredient) {
-            acc[item] = {
-              ...ingredient,
-              count: 1,
-            };
+            acc[item] = { ...ingredient, count: 1 };
           }
         } else {
           acc[item].count++;
         }
-
         return acc;
       },
       {}

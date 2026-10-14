@@ -4,6 +4,8 @@ import {
   ProfileIcon,
   Logo,
 } from '@krgaa/react-developer-burger-ui-components';
+import { NavLink } from 'react-router-dom';
+import clsx from 'clsx';
 
 import type { TAppHeaderUIProps } from './type';
 
@@ -13,24 +15,51 @@ export const AppHeaderUI = ({ userName }: TAppHeaderUIProps): React.JSX.Element 
   <header className={styles.header}>
     <nav className={`${styles.menu} p-4`}>
       <div className={styles.menu_part_left}>
-        <>
-          <BurgerIcon type={'primary'} />
+        <NavLink
+          to="/"
+          end
+          className={({ isActive }) =>
+            clsx(styles.link, 'text text_type_main-default ml-2 mr-10', {
+              [styles.link_active]: isActive,
+            })
+          }
+        >
+          <BurgerIcon type="primary" />
           <p className="text text_type_main-default ml-2 mr-10">Конструктор</p>
-        </>
-        <>
-          <ListIcon type={'primary'} />
+        </NavLink>
+
+        <NavLink
+          to="/feed"
+          className={({ isActive }) =>
+            clsx(styles.link, 'text text_type_main-default ml-2', {
+              [styles.link_active]: isActive,
+            })
+          }
+        >
+          <ListIcon type="primary" />
           <p className="text text_type_main-default ml-2">Лента заказов</p>
-        </>
+        </NavLink>
       </div>
+
       <div className={styles.logo}>
-        <Logo className="" />
+        <NavLink to="/">
+          <Logo className="" />
+        </NavLink>
       </div>
-      <div className={styles.link_position_last}>
-        <ProfileIcon type={'primary'} />
+
+      <NavLink
+        to="/profile"
+        className={({ isActive }) =>
+          clsx(styles.link, styles.link_position_last, 'ml-2', {
+            [styles.link_active]: isActive,
+          })
+        }
+      >
+        <ProfileIcon type="primary" />
         <p className="text text_type_main-default ml-2">
           {userName ?? 'Личный кабинет'}
         </p>
-      </div>
+      </NavLink>
     </nav>
   </header>
 );

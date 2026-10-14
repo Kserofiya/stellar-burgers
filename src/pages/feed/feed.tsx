@@ -1,17 +1,36 @@
+import { useEffect } from 'react';
+
 import { Preloader } from '@ui';
 import { FeedUI } from '@ui-pages';
-
-import type { TOrder } from '@utils-types';
+import { useDispatch, useSelector } from '@services/store';
+import {
+  getFeeds,
+  wsConnectionStart,
+  wsConnectionClosed,
+} from '@slices/feedSlice';
 
 export const Feed = (): React.JSX.Element => {
-  // TODO: Взять переменную из стора
-  const orders: TOrder[] = [];
+  const dispatch = useDispatch();
+  const orders = useSelector((state) => state.feed.orders);
+  const isLoading = useSelector((state) => state.feed.isLoading);
+
+  useEffect(() => {
+    // HTTP-запрос как страховка + WS для real-time
+    dispatch(getFeeds());
+    dispatch(wsConnectionStart());
+
+    return () => {
+      dispatch(wsConnectionClosed());
+    };
+  }, [dispatch]);
 
   const handleGetFeeds = (): void => {
-    // TODO: Запросить ленту заказов
+    dispatch(getFeeds());
+    dispatch(wsConnectionClosed());
+    dispatch(wsConnectionStart());
   };
 
-  if (!orders.length) {
+  if (isLoading && !orders.length) {
     return <Preloader />;
   }
 
