@@ -1,5 +1,5 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-import type { PayloadAction, SerializedError } from '@reduxjs/toolkit';
+import type { SerializedError } from '@reduxjs/toolkit';
 
 import { getFeedsApi } from '@api';
 import type { TOrder } from '@utils-types';
@@ -9,7 +9,7 @@ type TFeedState = {
   total: number;
   totalToday: number;
   isLoading: boolean;
-  error: SerializedError | string | null;
+  error: SerializedError | null;
 };
 
 const initialState: TFeedState = {
@@ -20,7 +20,6 @@ const initialState: TFeedState = {
   error: null,
 };
 
-// HTTP-загрузка (можно оставить для первоначальной подгрузки)
 export const getFeeds = createAsyncThunk('feed/getFeeds', async () =>
   getFeedsApi()
 );
@@ -28,34 +27,7 @@ export const getFeeds = createAsyncThunk('feed/getFeeds', async () =>
 export const feedSlice = createSlice({
   name: 'feed',
   initialState,
-  reducers: {
-    wsConnectionStart: (state) => {
-      state.isLoading = true;
-      state.error = null;
-    },
-    wsConnectionSuccess: (state) => {
-      state.isLoading = false;
-    },
-    wsConnectionError: (state, action: PayloadAction<string>) => {
-      state.isLoading = false;
-      state.error = action.payload;
-    },
-    wsConnectionClosed: (state) => {
-      state.isLoading = false;
-    },
-    wsGetMessage: (
-      state,
-      action: PayloadAction<{
-        orders: TOrder[];
-        total: number;
-        totalToday: number;
-      }>
-    ) => {
-      state.orders = action.payload.orders;
-      state.total = action.payload.total;
-      state.totalToday = action.payload.totalToday;
-    },
-  },
+  reducers: {},
   extraReducers: (builder) => {
     builder
       .addCase(getFeeds.pending, (state) => {
@@ -74,13 +46,5 @@ export const feedSlice = createSlice({
       });
   },
 });
-
-export const {
-  wsConnectionStart,
-  wsConnectionSuccess,
-  wsConnectionError,
-  wsConnectionClosed,
-  wsGetMessage,
-} = feedSlice.actions;
 
 export const feedReducer = feedSlice.reducer;

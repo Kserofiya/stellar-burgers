@@ -1,27 +1,22 @@
 import { useEffect } from 'react';
 
+import { Preloader } from '@ui';
 import { ProfileOrdersUI } from '@ui-pages';
 import { useDispatch, useSelector } from '@services/store';
-import { getCookie } from '@utils/cookie';
-import {
-  getProfileOrders,
-  ordersWsConnectionStart,
-  ordersWsConnectionClosed,
-} from '@slices/ordersSlice';
+import { getProfileOrders } from '@slices/ordersSlice';
 
 export const ProfileOrders = (): React.JSX.Element => {
   const dispatch = useDispatch();
   const orders = useSelector((state) => state.orders.orders);
+  const isLoading = useSelector((state) => state.orders.isLoading);
 
   useEffect(() => {
-    const token = getCookie('accessToken');
     dispatch(getProfileOrders());
-    dispatch(ordersWsConnectionStart(token ? `?token=${token}` : ''));
-
-    return () => {
-      dispatch(ordersWsConnectionClosed());
-    };
   }, [dispatch]);
 
-  return <ProfileOrdersUI orders={orders} />;
+  if (isLoading && !orders.length) {
+    return <Preloader />;
+  }
+
+  return <ProfileOrdersUI orders={orders} isLoading={isLoading} />;
 };
