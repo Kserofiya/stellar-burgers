@@ -1,19 +1,46 @@
+import { useEffect } from 'react';
+import { Routes, Route, useLocation, useNavigate } from 'react-router-dom';
+
 import { AppHeader } from '@components';
-import { ConstructorPage } from '@pages';
+import {
+  ConstructorPage,
+  Feed,
+  Login,
+  Register,
+  ForgotPassword,
+  ResetPassword,
+  Profile,
+  ProfileOrders,
+  NotFound404,
+} from '@pages';
 import { Preloader } from '@ui';
-import { Routes, Route } from 'react-router-dom';
+import { useDispatch, useSelector } from '@services/store';
+import { getIngredients } from '@slices/ingredientsSlice';
+import { getUser } from '@slices/userSlice';
+import { ProtectedRoute } from '../protected-route';
+import { Modal } from '../modal';
+import { IngredientDetails } from '../ingredient-details';
+import { OrderInfo } from '../order-info';
 
 import type { AppContentProps } from './type';
-import type { TIngredient } from '@utils-types';
 
 import '../../index.css';
 
 import styles from './app.module.css';
 
 const App = (): React.JSX.Element => {
-  const ingredients: TIngredient[] = [];
-  const isIngredientsLoading = false;
-  const ingredientsError = null;
+  const dispatch = useDispatch();
+
+  const ingredients = useSelector((state) => state.ingredients.ingredients);
+  const isIngredientsLoading = useSelector(
+    (state) => state.ingredients.isLoading
+  );
+  const ingredientsError = useSelector((state) => state.ingredients.error);
+
+  useEffect(() => {
+    dispatch(getIngredients());
+    dispatch(getUser());
+  }, [dispatch]);
 
   return (
     <div className={styles.app}>
@@ -51,7 +78,9 @@ const AppContent = ({
 
   if (!ingredients.length) {
     return (
-      <p className={`${styles.message} text text_type_main-medium`}>Нет ингредиентов</p>
+      <p className={`${styles.message} text text_type_main-medium`}>
+        Нет ингредиентов
+      </p>
     );
   }
 
@@ -59,11 +88,72 @@ const AppContent = ({
 };
 
 const RouteComponent = (): React.JSX.Element => {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const background = location.state?.background;
+
+  const handleCloseModal = (): void => {
+    navigate(-1);
+  };
+
   return (
     <>
-      <Routes>
+      {/* Основные маршруты. Если открыта модалка — location фиксируется на фоне */}
+      <Routes location={background || location}>
         <Route path="/" element={<ConstructorPage />} />
+        <Route path="/feed" element={<Feed />} />
+
+        {/* Только для НЕавторизованных */}
+        <Route element={<ProtectedRoute onlyUnAuth />}>
+          <Route path="/login" element={<Login />} />
+          <Route path="/register" element={<Register />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
+        </Route>
+
+        {/* Только для авторизованных */}
+        <Route element={<ProtectedRoute />}>
+          <Route path="/profile" element={<Profile />} />
+          <Route path="/profile/orders" element={<ProfileOrders />} />
+          <Route path="/profile/orders/:number" element={<OrderInfo />} />
+        </Route>
+
+        {/* Детальные страницы при прямом переходе */}
+        <Route path="/ingredients/:id" element={<IngredientDetails />} />
+        <Route path="/feed/:number" element={<OrderInfo />} />
+
+        <Route path="*" element={<NotFound404 />} />
       </Routes>
+
+      {/* Модалки поверх фона */}
+      {background && (
+        <Routes>
+          <Route
+            path="/ingredients/:id"
+            element={
+              <Modal title="Детали ингредиента" onClose={handleCloseModal}>
+                <IngredientDetails />
+              </Modal>
+            }
+          />
+          <Route
+            path="/feed/:number"
+            element={
+              <Modal title="Детали заказа" onClose={handleCloseModal}>
+                <OrderInfo />
+              </Modal>
+            }
+          />
+          <Route
+            path="/profile/orders/:number"
+            element={
+              <Modal title="Детали заказа" onClose={handleCloseModal}>
+                <OrderInfo />
+              </Modal>
+            }
+          />
+        </Routes>
+      )}
     </>
   );
 };
