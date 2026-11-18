@@ -43,8 +43,10 @@ describe('Тестирование редьюсера burgerConstructorSlice', (
     const action = addIngredient(mockBun);
     const state = burgerConstructorSlice.reducer(initialState, action);
 
-    expect(state.bun).toBeDefined();
-    expect(state.bun?.name).toBe(mockBun.name);
+    expect(state.bun).toEqual({
+      ...mockBun,
+      id: expect.any(String),
+    });
     expect(state.ingredients).toEqual([]);
   });
 
@@ -54,7 +56,10 @@ describe('Тестирование редьюсера burgerConstructorSlice', (
 
     expect(state.bun).toBeNull();
     expect(state.ingredients.length).toBe(1);
-    expect(state.ingredients[0].name).toBe(mockIngredient.name);
+    expect(state.ingredients[0]).toEqual({
+      ...mockIngredient,
+      id: expect.any(String),
+    });
   });
 
   it('должен удалять ингредиент по id', () => {

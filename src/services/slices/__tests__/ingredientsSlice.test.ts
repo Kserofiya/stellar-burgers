@@ -29,8 +29,12 @@ describe('Тестирование редьюсера ingredientsSlice', () => {
     expect(state).toEqual(initialState);
   });
 
-  it('должен устанавливать isLoading = true при getIngredients.pending', () => {
-    const state = ingredientsSlice.reducer(initialState, getIngredients.pending(''));
+  it('должен устанавливать isLoading = true и сбрасывать ошибку при getIngredients.pending', () => {
+    const state = ingredientsSlice.reducer(
+      { ...initialState, error: { message: 'Старая ошибка' } },
+      getIngredients.pending('')
+    );
+
     expect(state).toEqual({
       ...initialState,
       isLoading: true,
@@ -50,13 +54,15 @@ describe('Тестирование редьюсера ingredientsSlice', () => {
     });
   });
 
-  it('должен сохранять ошибку и isLoading = false при getIngredients.rejected', () => {
+  it('должен сохранять ошибку при getIngredients.rejected', () => {
     const error = { message: 'Ошибка загрузки' };
+
     const state = ingredientsSlice.reducer(
       { ...initialState, isLoading: true },
-      getIngredients.rejected(new Error('Ошибка загрузки'), '')
+      getIngredients.rejected(new Error(error.message), '')
     );
+
     expect(state.isLoading).toBe(false);
-    expect(state.error).toBeDefined();
+    expect(state.error).toEqual(expect.objectContaining(error));
   });
 });
