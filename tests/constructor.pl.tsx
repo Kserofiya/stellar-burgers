@@ -2,122 +2,78 @@ import { test, expect } from '@playwright/test';
 
 test.describe('Страница конструктора бургера', () => {
   test.beforeEach(async ({ page }) => {
-    await page.route('**/api/ingredients', (route) => {
-      route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          success: true,
-          data: [
-            {
-              _id: '1', name: 'Краторная булка N-200i', type: 'bun',
-              proteins: 80, fat: 24, carbohydrates: 53, calories: 420, price: 1255,
-              image: 'https://code.s3.yandex.net/react/code/bun-02.png',
-              image_mobile: 'https://code.s3.yandex.net/react/code/bun-02-mobile.png',
-              image_large: 'https://code.s3.yandex.net/react/code/bun-02-large.png', __v: 0,
-            },
-            {
-              _id: '2', name: 'Биокотлета из марсианской Магнолии', type: 'main',
-              proteins: 420, fat: 142, carbohydrates: 242, calories: 4242, price: 424,
-              image: 'https://code.s3.yandex.net/react/code/meat-01.png',
-              image_mobile: 'https://code.s3.yandex.net/react/code/meat-01-mobile.png',
-              image_large: 'https://code.s3.yandex.net/react/code/meat-01-large.png', __v: 0,
-            }
-          ]
-        })
-      });
+    await page.routeFromHAR('tests/hars/ingredients.har', { url: '**/api/ingredients' });
+    await page.routeFromHAR('tests/hars/user.har', { url: '**/api/auth/user' });
+    await page.routeFromHAR('tests/hars/orders.har', { url: '**/api/orders' });
+
+    await page.addInitScript(() => {
+      localStorage.setItem('refreshToken', 'mock-refresh-token');
     });
+    await page.context().addCookies([
+      { name: 'accessToken', value: 'mock-access-token', domain: 'localhost', path: '/' },
+    ]);
 
     await page.goto('/');
+    // Без .first() — если булок будет две, тест упадет (это правильно)
     await expect(page.getByText('Краторная булка N-200i')).toBeVisible();
   });
 
   test('Добавление ингредиента из списка в конструктор', async ({ page }) => {
-    // Находим карточку булки и добавляем её
-    const bunCard = page.locator('li').filter({ hasText: 'Краторная булка N-200i' }).first();
-    await bunCard.getByRole('button', { name: 'Добавить' }).click();
+    await page.locator('li').filter({ hasText: 'Краторная булка N-200i' }).getByRole('button', { name: 'Добавить' }).click();
+    await page.locator('li').filter({ hasText: 'Биокотлета из марсианской Магнолии' }).getByRole('button', { name: 'Добавить' }).click();
 
-    // Находим карточку начинки и добавляем её
-    const mainCard = page.locator('li').filter({ hasText: 'Биокотлета из марсианской Магнолии' }).first();
-    await mainCard.getByRole('button', { name: 'Добавить' }).click();
-
-    // Проверяем, что цена обновилась: Булка (1255 * 2) + Начинка (424) = 2934
     await expect(page.getByText('2934', { exact: true })).toBeVisible();
   });
 
   test('Работа модальных окон ингредиента', async ({ page }) => {
-    // 1. Открытие модального окна
-    await page.getByText('Краторная булка N-200i').first().click();
-    await expect(page.getByText('Детали ингредиента')).toBeVisible();
+    // Открываем модалку кликом по названию булки
+    await page.getByText('Краторная булка N-200i').click();
 
-    // Проверяем, что в модалке отображаются данные ИМЕННО ТОГО ингредиента, по которому кликнули
-    await expect(page.getByText('Краторная булка N-200i').last()).toBeVisible();
-    await expect(page.getByText('Калории, ккал')).toBeVisible();
-    await expect(page.getByText('420')).toBeVisible(); // Проверяем калории этой булки
+    // Находим элемент модального окна по наличию заголовка h3
+    const modal = page.locator('div').filter({ has: page.locator('h3', { hasText: 'Детали ингредиента' }) });
 
-    // 2. Закрытие по крестику
-    const closeButton = page.locator('button').filter({ has: page.locator('svg') }).last();
-    await closeButton.click();
+    // Проверяем, что данные видны именно внутри модалки
+    await expect(modal.getByText('Краторная булка N-200i')).toBeVisible();
+    await expect(modal.getByText('Калории, ккал')).toBeVisible();
+    await expect(modal.getByText('420')).toBeVisible();
+
+    // Закрываем по крестику (кнопка с aria-label="Закрыть" уникальна для модалки)
+    await modal.getByRole('button', { name: 'Закрыть' }).click();
     await expect(page.getByText('Детали ингредиента')).not.toBeVisible();
 
-    // 3. Закрытие по оверлею (клик в верхний левый угол экрана)
-    await page.getByText('Краторная булка N-200i').first().click();
+    // Открываем снова и закрываем по оверлею
+    await page.getByText('Краторная булка N-200i').click();
     await expect(page.getByText('Детали ингредиента')).toBeVisible();
+
+    // Кликаем по оверлею (в левый верхний угол экрана)
     await page.mouse.click(10, 10);
     await expect(page.getByText('Детали ингредиента')).not.toBeVisible();
   });
 
   test('Создание заказа', async ({ page }) => {
-    // 1. Мокаем данные пользователя
-    await page.route('**/api/auth/user', (route) => {
-      route.fulfill({
-        status: 200, contentType: 'application/json',
-        body: JSON.stringify({ success: true, user: { email: 'test@test.ru', name: 'Test' } }),
-      });
-    });
+    // Собираем бургер
+    await page.locator('li').filter({ hasText: 'Краторная булка N-200i' }).getByRole('button', { name: 'Добавить' }).click();
+    await page.locator('li').filter({ hasText: 'Биокотлета из марсианской Магнолии' }).getByRole('button', { name: 'Добавить' }).click();
 
-    // 2. Мокаем создание заказа
-    await page.route('**/api/orders', (route) => {
-      route.fulfill({
-        status: 200, contentType: 'application/json',
-        body: JSON.stringify({ success: true, order: { number: 98765 } }),
-      });
-    });
-
-    // 3. Подставляем фейковые токены авторизации в localStorage и cookie
-    await page.addInitScript(() => {
-      localStorage.setItem('refreshToken', 'mock-refresh-token');
-    });
-    await page.context().addCookies([{
-        name: 'accessToken', value: 'mock-access-token', domain: 'localhost', path: '/',
-    }]);
-
-    // 4. Перезагружаем страницу, чтобы приложение подхватило токены
-    await page.reload();
-    await expect(page.getByText('Краторная булка N-200i')).toBeVisible();
-
-    // 5. Собираем бургер
-    const bunCard = page.locator('li').filter({ hasText: 'Краторная булка N-200i' }).first();
-    await bunCard.getByRole('button', { name: 'Добавить' }).click();
-
-    const mainCard = page.locator('li').filter({ hasText: 'Биокотлета из марсианской Магнолии' }).first();
-    await mainCard.getByRole('button', { name: 'Добавить' }).click();
-
-    // 6. Кликаем "Оформить заказ"
+    // Оформляем
     const orderButton = page.getByRole('button', { name: 'Оформить заказ' });
     await expect(orderButton).toBeEnabled();
     await orderButton.click();
 
-    // 7. Проверяем модалку с верным номером заказа
-    await expect(page.getByText(/98765/)).toBeVisible();
-    await expect(page.getByText('идентификатор заказа')).toBeVisible();
+    // Находим модалку заказа (привязываемся к кнопке "Закрыть", убираем .last())
+    const modal = page.locator('div').filter({ has: page.getByRole('button', { name: 'Закрыть' }) });
 
-    // 8. Закрываем модалку и проверяем, что она закрылась
-    const closeButton = page.locator('button').filter({ has: page.locator('svg') }).last();
-    await closeButton.click();
-    await expect(page.getByText(/98765/)).not.toBeVisible();
+    // Проверяем номер заказа в теге h2 и текст идентификатора
+    await expect(modal.locator('h2')).toHaveText('98765');
+    await expect(modal.getByText('идентификатор заказа')).toBeVisible();
 
-    // 9. Проверяем, что конструктор пуст (цена сбросилась)
+    // Закрываем модалку
+    await modal.getByRole('button', { name: 'Закрыть' }).click();
+
+    // Проверяем, что модалка закрылась (кнопка "Закрыть" пропала)
+    await expect(page.getByRole('button', { name: 'Закрыть' })).not.toBeVisible();
+
+    // Проверяем, что конструктор пуст (цена сбросилась)
     await expect(page.getByText('2934', { exact: true })).not.toBeVisible();
     await expect(page.getByText('0', { exact: true })).toBeVisible();
   });
